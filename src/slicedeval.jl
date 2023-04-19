@@ -53,8 +53,9 @@ end
 next_vector_slice(slice::FixedSlice, dim::Int, iter::Int) = ceil(Int, log2(dim) * slice.Δ)
 function next_vector_slice(slice::DecreasingSlice, dim::Int, iter::Int)
     #d = iter == 0 ? 0.0 : iter^1.5
-    d = iter == 0 ? 0.0 : (iter+1)^1.5
+    #d = iter == 0 ? 0.0 : (iter+1)^1.5
     #d = iter^1.7
+    d = iter
     d = slice.maxΔ - d
     ceil(Int, log2(dim) * max(slice.minΔ, d))
 end
@@ -107,7 +108,7 @@ function SimilaritySearch.searchbatch(idx::SlicedEvaluation, queries::AbstractDa
     n = length(idx.db)
     I = Matrix{Int32}(undef, k, n)
     D = Matrix{Float32}(undef, k, n)
-    GC.enable(false)
+    #GC.enable(false)
  
     Threads.@threads for i in eachindex(queries)
         P = search_by_layers(idx, queries[i], reuse_cache!(n), k)
@@ -120,7 +121,7 @@ function SimilaritySearch.searchbatch(idx::SlicedEvaluation, queries::AbstractDa
             D[j, i] = P[j].weight
         end
     end
-    GC.enable(true)
+    #GC.enable(true)
     
     I, D
 end

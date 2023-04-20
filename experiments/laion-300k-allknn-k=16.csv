@@ -1,0 +1,6 @@
+name,slicetype,slicearg,splittype,splitarg,recall,searchtime
+exhaustive,,0.0,,0.0,1.0,1431.0
+SlicedEvaluation,F,8.0,F,3.0,0.86921126,1333.1044
+SlicedEvaluation,F,8.0,D,12.0,0.6181567,749.369
+SlicedEvaluation,D,16.0,F,3.0,0.9992404,1699.4705
+SlicedEvaluation,D,16.0,D,12.0,0.97285,1074.4174

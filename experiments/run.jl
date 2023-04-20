@@ -98,34 +98,52 @@ end
 
 function create_searchgraph(indexfile, db, dist)
     @info "creating $indexfile"
-
-    G
-end
-
-function main_searchgraph(db, queries, dist)
-    k = 16
-    output = "laion-300k-searchgraph-k=16-queries-10k.csv"
-    outputallknn = "laion-300k-searchgraph-k=16-allknn.csv"
-    E = ExhaustiveSearch(; db, dist)
-    t = @elapsed Igold, Dgold = searchbatch(E, db, k)
-    @show size(Igold)
-
-    @info "now running the algorithm"
-    D = DataFrame(name=String[], buildtime=Float32[], optimtime=Float32[], recall=Float32[], searchtime=Float32[])
-    Da = DataFrame(name=String[], buildtime=Float32[], optimtime=Float32[], recall=Float32[], searchtime=Float32[])
     G = SearchGraph(; db, dist, verbose=false)
     callbacks = SearchGraphCallbacks(MinRecall(0.9), verbose=false)
     neighborhood = Neighborhood(logbase=1.5)
     buildtime = @elapsed index!(G; neighborhood, callbacks)
+    saveindex(indexfile, G; meta=buildtime, store_db=false)
+end
+
+function allknn_goldstandard(filename, db, dist, k)
+    if isfile(filename)
+        knns, dists, searchtime = load(filename, "knns", "dists", "searchtime")
+    else
+        E = ExhaustiveSearch(; db, dist)
+        searchtime = @elapsed knns, dists = searchbatch(E, db, k)
+        jldsave(filename; knns, dists, searchtime)
+    end
+
+    @info "allknn $(size(knns)), searchtime: $searchtime"
+    knns, dists
+end
+
+function main_searchgraph(db, queries, dist)
+    k = 16
+    output = "laion-300k-searchgraph-k=$k-queries-10k.csv"
+    outputallknn = "laion-300k-searchgraph-k=$k-allknn.csv"
+    goldallknn = "laion-300k-goldstandard-k=$k-allknn.h5"
+    indexfile = "laion-300k-searchgraph-index.jld2"
+
+    goldallknnI, _ = allknn_goldstandard(goldallknn, db, dist, k)
+    E = ExhaustiveSearch(; db, dist)
+    searchtime = @elapsed Igold, Dgold = searchbatch(E, queries, k)
+    @info "$(k)nn searchtime: $searchtime"
+    create_searchgraph(indexfile, db, dist)
+    G, buildtime = loadindex(indexfile, db; staticgraph=true)
+    
+    @info "now running the algorithm"
+    D = DataFrame(name=String[], buildtime=Float32[], optimtime=Float32[], recall=Float32[], searchtime=Float32[])
+    Da = DataFrame(name=String[], buildtime=Float32[], optimtime=Float32[], recall=Float32[], searchtime=Float32[])
 
     for minrecall in (0.7, 0.8, 0.9, 0.95, 0.99)
-        optimtime = @elapsed = optimize!(G, MinRecall(minrecall))
-        I, _ = searchbatch(G, queries, k)
+        optimtime = @elapsed optimize!(G, MinRecall(minrecall))
+        searchtime = @elapsed I, _ = searchbatch(G, queries, k)
         recall = macrorecall(Igold, I)
         push!(D, ("ABS r=$minrecall", buildtime, optimtime, recall, searchtime))
 
-        I, _ = searchbatch(G, database(G), k)
-        recall = macrorecall(Igold, I)
+        searchtime = @elapsed I, _ = searchbatch(G, database(G), k)
+        recall = macrorecall(goldallknnI, I)
         push!(Da, ("ABS r=$minrecall", buildtime, optimtime, recall, searchtime))
     end
 
